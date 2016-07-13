@@ -1,12 +1,11 @@
-from typing import Dict, Optional, Sequence, Tuple
+from typing import Callable, Dict, Sequence, Tuple, cast
 
 from .promises import promise
-from .types import PromiseArg, Thenable, ThenableProxy
+from .types import Thenable, ThenableProxy
 
 __all__ = ['barrier']
 
 
-@Thenable.register
 class barrier(ThenableProxy):
     """Synchronization primitive to call a callback after a list
     of promises have been fulfilled.
@@ -33,11 +32,11 @@ class barrier(ThenableProxy):
     the barrier is fulfilled.
     """
 
-    def __init__(self, promises: Optional[Sequence[Thenable]] = None,
-                 args: Optional[Tuple] = None,
-                 kwargs: Optional[Dict] = None,
-                 callback: Optional[PromiseArg] = None,
-                 size: Optional[int] = None) -> None:
+    def __init__(self, promises: Sequence[Thenable] = None,
+                 args: Tuple = None,
+                 kwargs: Dict = None,
+                 callback: Callable = None,
+                 size: int = None) -> None:
         self._set_promise_target(promise())
         self.args = args or ()      # type: Tuple
         self.kwargs = kwargs or {}  # type: Dict
@@ -82,7 +81,7 @@ class barrier(ThenableProxy):
         if not self.cancelled:
             if self.ready:
                 raise ValueError('Cannot add promise to full barrier')
-            p.then(self)
+            p.then(cast(Thenable, self))
         return p
 
     def extend(self, promises: Sequence[Thenable]) -> None:

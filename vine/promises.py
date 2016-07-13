@@ -1,19 +1,17 @@
 import sys
 
 from collections import deque
-from reprlib import recursive_repr
 from types import TracebackType
 from typing import (
-    Any, Callable, Dict, MutableSequence, Optional, Sequence, cast,
+    Any, Callable, Dict, MutableSequence, Sequence, Tuple, cast,
 )
 
-from .types import Thenable
+from .types import PromiseT, Thenable
 
 __all__ = ['promise']
 
 
-@Thenable.register
-class promise:
+class promise(Thenable):
     """Future evaluation.
 
     This is a special implementation of promises in that it can
@@ -76,35 +74,67 @@ class promise:
                 self.buffer.append(value)
 
     """
-    if not hasattr(sys, 'pypy_version_info'):  # pragma: no cover
-        __slots__ = (
-            'fun', 'args', 'kwargs', 'ready', 'failed',
-            'value', 'reason', '_svpending', '_lvpending',
-            'on_error', 'cancelled',
-        )
+    cancelled = False
+    ready = False
+    failed = False
+    value = None      # type: Any
+    reason = None     # type: BaseException
 
-    def __init__(self, fun: Optional[Callable] = None,
-                 args: Optional[Sequence] = None,
-                 kwargs: Optional[Dict] = None,
-                 callback: Optional[Callable] = None,
-                 on_error: Optional[Callable] = None) -> None:
-        self.fun = fun
+    def __init__(self, fun: Callable = None,
+                 args: Sequence = None,
+                 kwargs: Dict = None,
+                 callback: PromiseT = None,
+                 on_error: Callable = None,
+                 cancelled: bool = False,
+                 ready: bool = False,
+                 failed: bool = False,
+                 value: Any = None,
+                 reason: BaseException = None,
+                 _svpending: Thenable = None,
+                 _lvpending: Sequence[Thenable] = None) -> None:
+        self.fun = fun                          # type: Callable
         self.args = cast(Sequence, args or ())  # type: Sequence
-        self.kwargs = kwargs or {}
-        self.ready = False
-        self.failed = False
-        self.value = None        # type: Any
-        self.reason = None       # type: Optional[BaseException]
-        self._svpending = None   # type: Thenable
-        self._lvpending = None   # type: deque[Thenable]
-        self.on_error = cast(Thenable, on_error)
-        self.cancelled = False
+        self.kwargs = kwargs or {}              # type: Dict
+        self.cancelled = cancelled              # type: bool
+        self.ready = ready                      # type: bool
+        self.failed = failed                    # type: bool
+        self.value = value                      # type: bool
+        self.reason = reason                # type: BaseException
+        self._svpending = _svpending        # type: Thenable
+        self._lvpending = None              # type: deque[Thenable]
+        self.on_error = on_error            # type: Callable
 
         if callback is not None:
             self.then(callback)
 
         if self.fun:
             assert callable(fun)
+
+    def partial(self, *args, **kwargs) -> 'Thenable':
+        return self.clone(args=args, kwargs=kwargs)
+
+    def partial_inplace(self, *args, **kwargs) -> None:
+        if args:
+            self.args = args + cast(Tuple, self.args)
+        if kwargs:
+            self.kwargs.update(kwargs)
+
+    def clone(self, args: Tuple[Any, ...]=(), kwargs: Dict={}) -> 'Thenable':
+        return type(self)(
+            self.fun,
+            args + cast(Tuple, self.args) if args else self.args,
+            dict(self.kwargs, **kwargs) if kwargs else self.kwargs,
+            cancelled=self.cancelled,
+            ready=self.ready,
+            failed=self.failed,
+            value=self.value,
+            reason=self.reason,
+            _svpending=self._svpending,
+            _lvpending=self._lvpending,
+        )
+
+    def __copy__(self):
+        return self.clone()
 
     def cancel(self) -> None:
         self.cancelled = True
@@ -125,7 +155,7 @@ class promise:
         ca = ()  # type: Sequence
         ck = {}  # type: Dict
         retval = None  # type: Any
-        final_args = (self.args + cast(MutableSequence, args) if args
+        final_args = (cast(Tuple, self.args) + cast(Tuple, args) if args
                       else self.args)  # type: Sequence
         final_kwargs = (dict(self.kwargs, **kwargs) if kwargs
                         else self.kwargs)  # type: Dict
@@ -163,11 +193,11 @@ class promise:
                 self._lvpending = None
         return retval
 
-    def then(self, callback: Callable,
-             on_error: Optional[Callable] = None) -> Thenable:
+    def then(self, callback: PromiseT,
+             on_error: PromiseT = None) -> Thenable:
         p = cast(Thenable, callback)
-        if isinstance(p, Thenable):
-            p = promise(callback, on_error=on_error)
+        if not isinstance(p, Thenable):
+            p = type(self)(callback, on_error=on_error)
         if self.cancelled:
             p.cancel()
             return p
@@ -186,15 +216,15 @@ class promise:
         self._lvpending.append(p)
         return p
 
-    def throw1(self, exc: Optional[BaseException] = None) -> None:
+    def throw1(self, exc: BaseException = None) -> None:
         if not self.cancelled:
             exc = exc if exc is not None else sys.exc_info()[1]
             self.failed, self.reason = True, exc
             if self.on_error:
-                self.on_error(*self.args + (exc,), **self.kwargs)
+                self.on_error(*cast(Tuple, self.args) + (exc,), **self.kwargs)
 
-    def throw(self, exc: Optional[BaseException] = None,
-              tb: Optional[TracebackType] = None,
+    def throw(self, exc: BaseException = None,
+              tb: TracebackType = None,
               propagate: int = True) -> None:
         if not self.cancelled:
             current_exc = sys.exc_info()[1]
@@ -231,3 +261,7 @@ class promise:
         if self._lvpending:
             return self._lvpending
         return [self._svpending]
+
+
+def z() -> Thenable:
+    return promise(args=None, fun=None)

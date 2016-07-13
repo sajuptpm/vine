@@ -10,11 +10,10 @@ __all__ = [
 ]
 
 
-def maybe_promise(p: Optional[Callable]) -> Optional[Thenable]:
-    p = cast(Thenable, p)
+def maybe_promise(p: Optional[Callable]) -> Thenable:
     if p and not isinstance(p, Thenable):
         return promise(p)
-    return p
+    return cast(Thenable, p)
 
 
 def ensure_promise(p: Optional[Callable]) -> Thenable:
@@ -25,10 +24,7 @@ def ensure_promise(p: Optional[Callable]) -> Thenable:
 
 def ppartial(p: Optional[Callable], *args, **kwargs) -> Thenable:
     _p = ensure_promise(p)
-    if args:
-        _p.args = args + _p.args
-    if kwargs:
-        _p.kwargs.update(kwargs)
+    _p.partial_inplace(*args, **kwargs)
     return _p
 
 
@@ -39,7 +35,7 @@ def preplace(p: Thenable, *args, **kwargs) -> Thenable:
     return promise(_replacer)
 
 
-def ready_promise(callback: Optional[Callable] = None, *args) -> Any:
+def ready_promise(callback: Callable = None, *args) -> Any:
     p = ensure_promise(callback)
     p(*args)
     return p
@@ -73,13 +69,15 @@ def transform(filter_: Callable, callback: Callable,
 
     """
     pcallback = ensure_promise(callback)
-    P = promise(_transback, (filter_, pcallback, filter_args, filter_kwargs))
-    P.then(promise(), pcallback.throw)
+    P = promise(_transback, (   # type: Thenable
+        filter_, pcallback, filter_args, filter_kwargs,
+    ))
+    P.then(cast(Callable, promise()), cast(Callable, pcallback.throw))
     return P
 
 
 def _transback(filter_: Callable, callback: Thenable,
-               args: Tuple, kwargs: Dict, ret: Any) -> Any:
+               args: Tuple[Any, ...], kwargs: Dict, ret: Any) -> Any:
     try:
         ret = filter_(*args + (ret,), **kwargs)
     except Exception:
@@ -88,12 +86,12 @@ def _transback(filter_: Callable, callback: Thenable,
         return callback(ret)
 
 
-def wrap(p: Thenable):
+def wrap(p: Callable):
     """Wrap promise so that if the promise is called with a promise as
     argument, we attach ourselves to that promise instead."""
 
     def on_call(*args, **kwargs) -> Any:
-        if len(args) == 1 and isinstance(args[0], promise):
+        if len(args) == 1 and isinstance(args[0], Thenable):
             return args[0].then(p)
         else:
             return p(*args, **kwargs)

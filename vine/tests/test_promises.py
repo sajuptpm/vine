@@ -2,7 +2,7 @@ import traceback
 
 from collections import deque
 from struct import pack, unpack
-from typing import Callable, Optional
+from typing import Callable
 
 import sys
 
@@ -24,17 +24,17 @@ class test_promise(Case):
                 self.buffer = []
 
             def read(self, size: int,
-                     callback: Optional[Callable] = None) -> Callable:
+                     callback: Callable = None) -> Callable:
                 callback = callback or promise()
                 _pending.append((size, callback))
                 return callback
 
             def read_header(self,
-                            callback: Optional[Callable] = None) -> Callable:
+                            callback: Callable = None) -> Callable:
                 return self.read(4, callback)
 
             def read_body(self, header: bytes,
-                          callback: Optional[Callable] = None) -> Callable:
+                          callback: Callable = None) -> Callable:
                 body_size, = unpack('>L', header)
                 return self.read(body_size, callback)
 
