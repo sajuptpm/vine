@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Tuple, cast
 
 from .promises import promise
-from .types import Thenable
+from .types import Thenable, PromiseT
 
 __all__ = [
     'maybe_promise', 'ensure_promise',
@@ -10,19 +10,19 @@ __all__ = [
 ]
 
 
-def maybe_promise(p: Optional[Callable]) -> Thenable:
+def maybe_promise(p: Optional[PromiseT]) -> Thenable:
     if p and not isinstance(p, Thenable):
         return promise(p)
     return cast(Thenable, p)
 
 
-def ensure_promise(p: Optional[Callable]) -> Thenable:
+def ensure_promise(p: Optional[PromiseT]) -> Thenable:
     if p is None:
         return promise()
     return cast(Thenable, maybe_promise(p))
 
 
-def ppartial(p: Optional[Callable], *args, **kwargs) -> Thenable:
+def ppartial(p: Optional[PromiseT], *args, **kwargs) -> Thenable:
     _p = ensure_promise(p)
     _p.partial_inplace(*args, **kwargs)
     return _p

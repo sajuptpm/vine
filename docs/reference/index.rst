@@ -14,5 +14,3 @@
     vine.synchronization
     vine.funtools
     vine.types
-    vine.five
-    vine.utils

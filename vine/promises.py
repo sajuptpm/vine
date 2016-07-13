@@ -80,7 +80,7 @@ class promise(Thenable):
     value = None      # type: Any
     reason = None     # type: BaseException
 
-    def __init__(self, fun: Callable = None,
+    def __init__(self, fun: PromiseT = None,
                  args: Sequence = None,
                  kwargs: Dict = None,
                  callback: PromiseT = None,
@@ -92,7 +92,7 @@ class promise(Thenable):
                  reason: BaseException = None,
                  _svpending: Thenable = None,
                  _lvpending: Sequence[Thenable] = None) -> None:
-        self.fun = fun                          # type: Callable
+        self.fun = fun                          # type: PromiseT
         self.args = cast(Sequence, args or ())  # type: Sequence
         self.kwargs = kwargs or {}              # type: Dict
         self.cancelled = cancelled              # type: bool
@@ -161,7 +161,7 @@ class promise(Thenable):
                         else self.kwargs)  # type: Dict
         if self.fun:
             try:
-                retval = self.fun(*final_args, **final_kwargs)
+                retval = cast(Callable, self.fun)(*final_args, **final_kwargs)
                 ca = (retval,)
                 ck = {}
                 self.value = (ca, ck)
