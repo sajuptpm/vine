@@ -97,7 +97,7 @@ setup(
     url=meta['homepage'],
     platforms=['any'],
     license='BSD',
-    packages=find_packages(exclude=['ez_setup', 'tests', 'tests.*']),
+    packages=find_packages(exclude=['tests', 't', 'tests.*']),
     zip_safe=False,
     install_requires=install_requires,
     tests_require=tests_require,

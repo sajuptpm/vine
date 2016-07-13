@@ -100,3 +100,12 @@ class barrier(PromiseProxy):
     @p.setter
     def p(self, p: ImmutablePromise) -> None:
         self._p = p
+
+    def clone(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def partial(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def partial_inplace(self, *args, **kwargs):
+        raise NotImplementedError()
