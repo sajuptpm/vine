@@ -35,13 +35,13 @@ def preplace(p: PromiseT, *args, **kwargs) -> ImmutablePromise:
     return promise(_replacer)
 
 
-def ready_promise(callback: PromiseT = None, *args) -> Any:
+def ready_promise(callback: PromiseT = None, *args: Any) -> Any:
     p = ensure_promise(callback)
     p(*args)
     return p
 
 
-def starpromise(fun: PromiseT, *args, **kwargs) -> ImmutablePromise:
+def starpromise(fun: PromiseT, *args: Any, **kwargs) -> ImmutablePromise:
     return promise(fun, args, kwargs)
 
 

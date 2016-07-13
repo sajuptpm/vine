@@ -1,0 +1,6 @@
+- Classes that define __call__ are not Callable:
+      python/mypy#797 (https://github.com/python/mypy/issues/797)
+
+    Need to rewrite all PromiseT types to just be Callable when this is fixed.
+
+
