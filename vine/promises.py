@@ -6,12 +6,12 @@ from typing import (
     Any, Callable, Dict, MutableSequence, Sequence, Tuple, cast,
 )
 
-from .types import PromiseT, Thenable
+from .types import PromiseT, ImmutablePromise
 
 __all__ = ['promise']
 
 
-class promise(Thenable):
+class promise(ImmutablePromise):
     """Future evaluation.
 
     This is a special implementation of promises in that it can
@@ -77,6 +77,7 @@ class promise(Thenable):
     cancelled = False
     ready = False
     failed = False
+    fun = None        # type: PromiseT
     value = None      # type: Any
     reason = None     # type: BaseException
 
@@ -84,14 +85,14 @@ class promise(Thenable):
                  args: Sequence = None,
                  kwargs: Dict = None,
                  callback: PromiseT = None,
-                 on_error: Callable = None,
+                 on_error: PromiseT = None,
                  cancelled: bool = False,
                  ready: bool = False,
                  failed: bool = False,
                  value: Any = None,
                  reason: BaseException = None,
-                 _svpending: Thenable = None,
-                 _lvpending: Sequence[Thenable] = None) -> None:
+                 _svpending: ImmutablePromise = None,
+                 _lvpending: Sequence[ImmutablePromise] = None) -> None:
         self.fun = fun                          # type: PromiseT
         self.args = cast(Sequence, args or ())  # type: Sequence
         self.kwargs = kwargs or {}              # type: Dict
@@ -100,9 +101,9 @@ class promise(Thenable):
         self.failed = failed                    # type: bool
         self.value = value                      # type: bool
         self.reason = reason                # type: BaseException
-        self._svpending = _svpending        # type: Thenable
-        self._lvpending = None              # type: deque[Thenable]
-        self.on_error = on_error            # type: Callable
+        self._svpending = _svpending        # type: ImmutablePromise
+        self._lvpending = None              # type: deque[ImmutablePromise]
+        self.on_error = on_error            # type: PromiseT
 
         if callback is not None:
             self.then(callback)
@@ -110,7 +111,7 @@ class promise(Thenable):
         if self.fun:
             assert callable(fun)
 
-    def partial(self, *args, **kwargs) -> 'Thenable':
+    def partial(self, *args, **kwargs) -> ImmutablePromise:
         return self.clone(args=args, kwargs=kwargs)
 
     def partial_inplace(self, *args, **kwargs) -> None:
@@ -119,7 +120,8 @@ class promise(Thenable):
         if kwargs:
             self.kwargs.update(kwargs)
 
-    def clone(self, args: Tuple[Any, ...]=(), kwargs: Dict={}) -> 'Thenable':
+    def clone(self, args: Tuple[Any, ...]=(),
+              kwargs: Dict={}) -> ImmutablePromise:
         return type(self)(
             self.fun,
             args + cast(Tuple, self.args) if args else self.args,
@@ -144,7 +146,7 @@ class promise(Thenable):
             if self._lvpending is not None:
                 for pending in self._lvpending:
                     pending.cancel()
-            if isinstance(self.on_error, Thenable):
+            if isinstance(self.on_error, ImmutablePromise):
                 self.on_error.cancel()
         finally:
             self._svpending = self._lvpending = self.on_error = None
@@ -194,9 +196,9 @@ class promise(Thenable):
         return retval
 
     def then(self, callback: PromiseT,
-             on_error: PromiseT = None) -> Thenable:
-        p = cast(Thenable, callback)
-        if not isinstance(p, Thenable):
+             on_error: PromiseT = None) -> ImmutablePromise:
+        p = cast(ImmutablePromise, callback)
+        if not isinstance(p, ImmutablePromise):
             p = type(self)(callback, on_error=on_error)
         if self.cancelled:
             p.cancel()
@@ -261,7 +263,3 @@ class promise(Thenable):
         if self._lvpending:
             return self._lvpending
         return [self._svpending]
-
-
-def z() -> Thenable:
-    return promise(args=None, fun=None)

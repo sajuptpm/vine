@@ -2,24 +2,29 @@ import abc
 import collections
 
 from types import TracebackType
-from typing import Any, Callable, Dict, Tuple, TypeVar
+from typing import Any, Callable, Dict, Tuple, Union
 
-__all__ = ['Thenable', 'ThenableProxy']
+__all__ = ['Thenable', 'PromiseProxy']
 
-PromiseT = TypeVar('PromiseT', Callable, 'Thenable')
+PromiseT = Union[Callable, 'ImmutablePromise']
 
 
-@collections.Callable.register
-class Thenable(metaclass=abc.ABCMeta):  # pragma: no cover
-
-    @abc.abstractmethod
-    def __call__(self, *args, **kwargs) -> Any:
-        ...
+class Thenable(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def then(self, on_success: PromiseT,
              on_error: PromiseT = None) -> 'Thenable':
         ...
+
+    @classmethod
+    def __subclasshook__(cls: Any, C: Any) -> bool:
+        if cls is Thenable:
+            if any('then' in B.__dict__ for B in C.__mro__):
+                return True
+        return NotImplemented
+
+
+class Throwable(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def throw(self, exc: BaseException = None,
@@ -27,12 +32,27 @@ class Thenable(metaclass=abc.ABCMeta):  # pragma: no cover
               propagate: int = True) -> None:
         ...
 
+    @classmethod
+    def __subclasshook__(cls: Any, C: Any) -> bool:
+        if cls is Thenable:
+            if any('throw' in B.__dict__ for B in C.__mro__):
+                return True
+        return NotImplemented
+
+
+@collections.Callable.register
+class ImmutablePromise(Thenable, Throwable, metaclass=abc.ABCMeta):
+
+    @abc.abstractmethod
+    def __call__(self, *args, **kwargs) -> Any:
+        ...
+
     @abc.abstractmethod
     def throw1(self, exc: BaseException = None) -> None:
         ...
 
     @abc.abstractmethod
-    def partial(self, *args, **kwargs) -> 'Thenable':
+    def partial(self, *args, **kwargs) -> 'ImmutablePromise':
         ...
 
     @abc.abstractmethod
@@ -40,7 +60,8 @@ class Thenable(metaclass=abc.ABCMeta):  # pragma: no cover
         ...
 
     @abc.abstractmethod
-    def clone(self, args: Tuple[Any, ...] = (), kwargs: Dict = {}) -> 'Thenable':
+    def clone(self, args: Tuple[Any, ...] = (),
+              kwargs: Dict = {}) -> 'ImmutablePromise':
         ...
 
     @abc.abstractmethod
@@ -74,17 +95,12 @@ class Thenable(metaclass=abc.ABCMeta):  # pragma: no cover
     def failed(self, failed: bool) -> None:
         ...
 
-    @classmethod
-    def __subclasshook__(cls: Any, C: Any) -> bool:
-        if cls is Thenable:
-            if any('then' in B.__dict__ for B in C.__mro__):
-                return True
-        return NotImplemented
 
+class PromiseProxy(ImmutablePromise):
 
-class ThenableProxy(Thenable):
+    _p = None  # type: ImmutablePromise
 
-    def _set_promise_target(self, p: Thenable) -> None:
+    def _set_promise_target(self, p: ImmutablePromise) -> None:
         self._p = p
 
     def then(self, on_success: PromiseT,

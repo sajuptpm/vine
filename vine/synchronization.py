@@ -1,12 +1,12 @@
 from typing import Callable, Dict, Sequence, Tuple, cast
 
 from .promises import promise
-from .types import Thenable, ThenableProxy
+from .types import ImmutablePromise, PromiseProxy
 
 __all__ = ['barrier']
 
 
-class barrier(ThenableProxy):
+class barrier(PromiseProxy):
     """Synchronization primitive to call a callback after a list
     of promises have been fulfilled.
 
@@ -32,7 +32,7 @@ class barrier(ThenableProxy):
     the barrier is fulfilled.
     """
 
-    def __init__(self, promises: Sequence[Thenable] = None,
+    def __init__(self, promises: Sequence[ImmutablePromise] = None,
                  args: Tuple = None,
                  kwargs: Dict = None,
                  callback: Callable = None,
@@ -72,31 +72,31 @@ class barrier(ThenableProxy):
             self.p(*self.args, **self.kwargs)
         self.finalized = True
 
-    def add(self, p: Thenable) -> None:
+    def add(self, p: ImmutablePromise) -> None:
         if not self.cancelled:
             self.add_noincr(p)
             self.size += 1
 
-    def add_noincr(self, p: Thenable) -> Thenable:
+    def add_noincr(self, p: ImmutablePromise) -> ImmutablePromise:
         if not self.cancelled:
             if self.ready:
                 raise ValueError('Cannot add promise to full barrier')
-            p.then(cast(Thenable, self))
+            p.then(cast(ImmutablePromise, self))
         return p
 
-    def extend(self, promises: Sequence[Thenable]) -> None:
+    def extend(self, promises: Sequence[ImmutablePromise]) -> None:
         if not self.cancelled:
             self.size += len(promises)
             self.extend_noincr(promises)
 
-    def extend_noincr(self, promises: Sequence[Thenable]) -> None:
+    def extend_noincr(self, promises: Sequence[ImmutablePromise]) -> None:
         if not self.cancelled:
             [self.add_noincr(p) for p in promises]
 
     @property
-    def p(self) -> Thenable:
+    def p(self) -> ImmutablePromise:
         return self._p
 
     @p.setter
-    def p(self, p: Thenable) -> None:
+    def p(self, p: ImmutablePromise) -> None:
         self._p = p
